@@ -1,0 +1,80 @@
+# coding=utf-8
+import struct
+import numpy as np
+from sklearn.svm import SVC
+from PIL import Image
+# ==================
+# data preprocessing
+# images in MNIST are 28 * 28 pixels
+# ==================
+
+# normalize image
+def convert_img(image):
+  image = np.array(image)
+  return np.round(image / 255)
+
+# read files
+def read_image(filename):
+  f = open(filename, 'rb')
+
+  index = 0
+  buf = f.read()
+  f.close()
+
+  magic, images, rows, columns = struct.unpack_from('>IIII', buf, index)
+  index += struct.calcsize('>IIII')
+
+  data_set = np.zeros((images, rows*columns))
+  for i in range(images):
+    raw_image = []
+    for x in range(rows):
+      for y in range(columns):
+        raw_image.append(int(struct.unpack_from('>B', buf, index)[0]))
+        index += struct.calcsize('>B')
+    image = convert_img(raw_image)
+    data_set[i, : ] = image
+  return data_set
+
+def read_label(filename):
+  f = open(filename, 'rb')
+
+  index = 0
+  buf = f.read()
+  f.close()
+
+  magic, items = struct.unpack_from('>II', buf, index)
+  index += struct.calcsize('>II')
+
+  data_set = np.zeros((items, 1))
+  for i in range(items):
+    item = int(struct.unpack_from('>B', buf, index)[0])
+    if (item != 1 and item != 2):
+      item = 0
+    index += struct.calcsize('>B')
+    data_set[i, :] = item
+  return data_set
+
+# create model
+def create_svm(dataMat, dataLabel, decision='ovr'):
+    clf = SVC(decision_function_shape=decision, verbose = True)
+    clf.fit(dataMat, dataLabel)
+    return clf
+
+# ====
+# main
+# ====
+def main():
+  train_data = read_image('./data/train-images.idx3-ubyte')
+  train_label = read_label('./data/train-labels.idx1-ubyte')
+  
+  print('training...')
+  svm = create_svm(train_data, train_label.ravel())
+  print('done.')
+
+  test_data = read_image('./data/t10k-images.idx3-ubyte')
+  test_label = read_label('./data/t10k-labels.idx1-ubyte')
+
+  acc = round(svm.score(test_data, test_label.ravel())*100, 2)
+  print('accuracy: ', acc)
+
+main()
